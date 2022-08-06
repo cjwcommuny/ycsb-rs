@@ -1,9 +1,11 @@
 use crate::db::DB;
+use crate::sqlite::SQLite;
 use crate::workload::Workload;
 use anyhow::{bail, Result};
 use futures::future::join_all;
 use properties::Properties;
 use std::fs;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 use structopt::StructOpt;
@@ -21,20 +23,18 @@ struct Opt {
     #[structopt(name = "COMMANDS")]
     commands: Vec<String>,
     #[structopt(short, long)]
-    database: String,
-    #[structopt(short, long)]
     workload: String,
     #[structopt(short, long, default_value = "1")]
     threads: usize,
 }
 
-async fn load(wl: Arc<CoreWorkload>, db: Arc<dyn DB + Send + Sync>, operation_count: usize) {
+async fn load<T: DB + Clone>(wl: Arc<CoreWorkload>, db: T, operation_count: usize) {
     for _ in 0..operation_count {
         wl.do_insert(db.clone()).await;
     }
 }
 
-async fn run(wl: Arc<CoreWorkload>, db: Arc<dyn DB + Send + Sync>, operation_count: usize) {
+async fn run<T: DB + Clone>(wl: Arc<CoreWorkload>, db: T, operation_count: usize) {
     for _ in 0..operation_count {
         wl.do_transaction(db.clone()).await;
     }
@@ -52,17 +52,31 @@ async fn main() -> Result<()> {
 
     let wl = Arc::new(CoreWorkload::new(&props));
 
-    if opt.commands.is_empty() {
+    let commands = opt.commands;
+
+    if commands.is_empty() {
         bail!("no command specified");
     }
 
-    let database = opt.database.clone();
-    let thread_operation_count = props.operation_count as usize / opt.threads;
-    for cmd in opt.commands {
+    let database = SQLite::new(Path::new("test.db"))?;
+    let n_threads = opt.threads;
+    let operation_count = props.operation_count as usize;
+    ycsb_run(database, commands, wl, operation_count, n_threads)
+}
+
+fn ycsb_run<T: DB + Clone + 'static>(
+    db: T,
+    commands: Vec<String>,
+    wl: Arc<CoreWorkload>,
+    operation_count: usize,
+    n_threads: usize,
+) -> Result<()> {
+    let thread_operation_count = operation_count as usize / n_threads;
+    for cmd in commands {
         let start = Instant::now();
         let mut threads = vec![];
-        for _ in 0..opt.threads {
-            let database = database.clone();
+        for _ in 0..n_threads {
+            let database = db.clone();
             let wl = wl.clone();
             let cmd = cmd.clone();
             let task = tokio::task::spawn(async move {
@@ -80,9 +94,9 @@ async fn main() -> Result<()> {
         }
         join_all(threads).await;
         let runtime = start.elapsed().as_millis();
-        println!("[OVERALL], ThreadCount, {}", opt.threads);
+        println!("[OVERALL], ThreadCount, {}", n_threads);
         println!("[OVERALL], RunTime(ms), {}", runtime);
-        let throughput = props.operation_count as f64 / (runtime as f64 / 1000.0);
+        let throughput = operation_count as f64 / (runtime as f64 / 1000.0);
         println!("[OVERALL], Throughput(ops/sec), {}", throughput);
     }
 

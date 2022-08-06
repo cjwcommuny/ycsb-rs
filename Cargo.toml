@@ -8,11 +8,11 @@ edition = "2021"
 anyhow = "1.0"
 async-trait = "0.1.52"
 futures = "0.3.18"
+itertools = "0.10"
 log = "0.4"
 rand = {version = "0.8", features = ["small_rng"]}
+rusqlite = "0.28"
 serde = { version = "1.0.130", features = ["derive"] }
-sql-builder = "3.1"
-sqlite = "0.26.0"
 structopt = "0.3.23"
 tokio = { version = "1.11.0", features = ["full"] }
 toml = "0.5.8"
