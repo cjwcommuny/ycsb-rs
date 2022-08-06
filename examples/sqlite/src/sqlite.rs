@@ -1,4 +1,4 @@
-use crate::db::DB;
+use ycsb::db::DB;
 
 use anyhow::Result;
 use async_trait::async_trait;
