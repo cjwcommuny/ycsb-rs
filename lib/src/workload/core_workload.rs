@@ -83,7 +83,7 @@ impl CoreWorkload {
         }
     }
 
-    async fn do_transaction_read<T: DB>(&self, db: T) {
+    async fn do_transaction_read<T: DB>(&self, db: &T) {
         let keynum = self.next_key_num();
         let dbkey = format!("{}", fnvhash64(keynum));
         let _ = db.read(self.table.clone(), dbkey).await.unwrap();
@@ -102,7 +102,7 @@ impl CoreWorkload {
 
 #[async_trait]
 impl Workload for CoreWorkload {
-    async fn do_insert<T: DB>(&self, db: T) {
+    async fn do_insert<T: DB>(&self, db: &T) {
         let dbkey = self
             .key_sequence
             .lock()
@@ -123,7 +123,7 @@ impl Workload for CoreWorkload {
         db.insert(self.table.clone(), dbkey, values).await.unwrap();
     }
 
-    async fn do_transaction<T: DB>(&self, db: T) {
+    async fn do_transaction<T: DB>(&self, db: &T) {
         let op = self
             .operation_chooser
             .lock()
