@@ -5,13 +5,13 @@ authors = ["Pekka Enberg <penberg@chiselstrike.com>"]
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0"
+anyhow = "1"
 log = "0.4"
 rand = {version = "0.8", features = ["small_rng"]}
-serde = { version = "1.0.130", features = ["derive"] }
-structopt = "0.3.23"
-toml = "0.5.8"
-async-trait = "0.1.52"
-futures = "0.3.18"
+serde = { version = "1", features = ["derive"] }
+structopt = "0.3"
+toml = "0.8"
+async-trait = "0.1"
+futures = "0.3"
 sql-builder = "3.1"
-tokio = { version = "1.11.0", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
