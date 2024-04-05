@@ -1,6 +1,5 @@
 use crate::db::DB;
 use crate::workload::Workload;
-use async_trait::async_trait;
 use rand::distributions::{Alphanumeric, DistString};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -100,7 +99,6 @@ impl CoreWorkload {
     }
 }
 
-#[async_trait]
 impl Workload for CoreWorkload {
     async fn do_insert<T: DB>(&self, db: &T) {
         let dbkey = self

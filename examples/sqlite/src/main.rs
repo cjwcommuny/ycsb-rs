@@ -1,5 +1,4 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use itertools::join;
 use std::collections::HashMap;
 use std::path::Path;
@@ -27,7 +26,6 @@ impl SQLite {
     }
 }
 
-#[async_trait]
 impl DB for SQLite {
     fn init(&self) -> Result<()> {
         // TODO: generic on the workload
