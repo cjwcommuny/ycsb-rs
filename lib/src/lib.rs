@@ -1,6 +1,7 @@
 use crate::db::DB;
 use crate::workload::Workload;
 use anyhow::{bail, Result};
+use futures::future::join_all;
 use std::fs;
 use std::sync::Arc;
 use std::time::Instant;
@@ -25,27 +26,27 @@ struct Opt {
     threads: usize,
 }
 
-fn load<T: DB>(wl: &CoreWorkload, db: &T, repeat: usize) {
+async fn load<T: DB>(wl: &CoreWorkload, db: &T, repeat: usize) {
     for _ in 0..repeat {
-        wl.do_insert(db);
+        wl.do_insert(db).await;
     }
 }
 
-fn run<T: DB>(wl: &CoreWorkload, db: &T, repeat: usize) {
+async fn run<T: DB>(wl: &CoreWorkload, db: &T, repeat: usize) {
     for _ in 0..repeat {
-        wl.do_transaction(db);
+        wl.do_transaction(db).await;
     }
 }
 
-fn thread_runner<T: DB>(db: Arc<T>, wl: Arc<CoreWorkload>, repeat: usize, cmd: &str) {
+async fn thread_runner<T: DB>(db: Arc<T>, wl: Arc<CoreWorkload>, repeat: usize, cmd: &str) {
     match cmd {
-        "load" => load(wl.as_ref(), db.as_ref(), repeat),
-        "run" => run(wl.as_ref(), db.as_ref(), repeat),
+        "load" => load(wl.as_ref(), db.as_ref(), repeat).await,
+        "run" => run(wl.as_ref(), db.as_ref(), repeat).await,
         _ => panic!("invalid command: {}", cmd),
     };
 }
 
-pub fn ycsb_run<T: DB + 'static>(
+pub async fn ycsb_run<T: DB + 'static>(
     db: T,
     commands: Vec<String>,
     wl: CoreWorkload,
@@ -57,18 +58,14 @@ pub fn ycsb_run<T: DB + 'static>(
     let wl = Arc::new(wl);
     for cmd in commands {
         let start = Instant::now();
-        let mut threads = vec![];
-        for _ in 0..n_threads {
+        let threads = (0..n_threads).map(|_| {
             let db_ref = db.clone();
             let wl_ref = wl.clone();
             let cmd_str = cmd.clone();
-            threads.push(thread::spawn(move || {
-                thread_runner(db_ref, wl_ref, operation_count / n_threads, &cmd_str)
-            }));
-        }
-        for t in threads {
-            let _ = t.join();
-        }
+            tokio::task::spawn(async move {
+                thread_runner(db_ref, wl_ref, operation_count / n_threads, &cmd_str).await
+            })
+        });
         join_all(threads).await;
         let runtime = start.elapsed().as_millis();
         println!("[OVERALL], ThreadCount, {}", n_threads);
@@ -80,7 +77,7 @@ pub fn ycsb_run<T: DB + 'static>(
     Ok(())
 }
 
-pub fn ycsb_main<T: DB + 'static>(db: T) -> Result<()> {
+pub async fn ycsb_main<T: DB + 'static>(db: T) -> Result<()> {
     let opt = Opt::from_args();
 
     let raw_props = fs::read_to_string(&opt.workload)?;
@@ -99,5 +96,5 @@ pub fn ycsb_main<T: DB + 'static>(db: T) -> Result<()> {
 
     let n_threads = opt.threads;
     let operation_count = props.operation_count as usize;
-    ycsb_run(db, commands, wl, operation_count, n_threads)
+    ycsb_run(db, commands, wl, operation_count, n_threads).await
 }

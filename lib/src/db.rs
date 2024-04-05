@@ -1,8 +1,7 @@
-use crate::sqlite::SQLite;
-use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Arc;
+
+use anyhow::Result;
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait DB: Send + Sync {
@@ -13,5 +12,5 @@ pub trait DB: Send + Sync {
         key: String,
         values: HashMap<String, String>,
     ) -> Result<()>;
-    async fn read(&self, table: String, key: String) -> Result<HashMap<String, String>>;
+    async fn read(&self, table: &str, key: &str) -> Result<HashMap<String, String>>;
 }

@@ -86,7 +86,7 @@ impl CoreWorkload {
     async fn do_transaction_read<T: DB>(&self, db: &T) {
         let keynum = self.next_key_num();
         let dbkey = format!("{}", fnvhash64(keynum));
-        let _ = db.read(self.table.clone(), dbkey).await.unwrap();
+        let _ = db.read(&self.table, &dbkey).await.unwrap();
         // TODO: verify rows
     }
 

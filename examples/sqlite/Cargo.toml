@@ -11,3 +11,5 @@ itertools = "0.10"
 rusqlite = "0.28"
 toml = "0.5.8"
 ycsb = { "path" = "../../lib" }
+tokio = { version = "1.37.0", features = ["full"] }
+async-trait = "0.1.79"

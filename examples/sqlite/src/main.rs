@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use itertools::join;
 use std::collections::HashMap;
 use std::path::Path;
@@ -26,6 +27,7 @@ impl SQLite {
     }
 }
 
+#[async_trait]
 impl DB for SQLite {
     fn init(&self) -> Result<()> {
         // TODO: generic on the workload
@@ -49,7 +51,12 @@ impl DB for SQLite {
         Ok(())
     }
 
-    fn insert(&self, table: &str, key: &str, values: &HashMap<&str, String>) -> Result<()> {
+    async fn insert(
+        &self,
+        table: String,
+        key: String,
+        values: HashMap<String, String>,
+    ) -> Result<()> {
         let mut values_vec = vec![(PRIMARY_KEY.to_string(), key.to_string())];
         values_vec.append(
             &mut values
@@ -71,10 +78,11 @@ impl DB for SQLite {
         Ok(())
     }
 
-    fn read(&self, table: &str, key: &str, result: &mut HashMap<String, String>) -> Result<()> {
+    async fn read(&self, table: &str, key: &str) -> Result<HashMap<String, String>> {
         // two paths:
         //  1. empty result map means read all
         //  2. result map with keys means read only those keys
+        let mut result = HashMap::new();
 
         let guard = self.conn.lock().unwrap();
         if result.is_empty() {
@@ -108,11 +116,12 @@ impl DB for SQLite {
                 Ok(())
             })?;
         }
-        Ok(())
+        Ok(result)
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let database = SQLite::new(Path::new("test.db"))?;
-    ycsb::ycsb_main(database)
+    ycsb::ycsb_main(database).await
 }
