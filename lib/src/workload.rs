@@ -1,7 +1,7 @@
 mod core_workload;
 
-use std::future::Future;
 pub use core_workload::CoreWorkload;
+use std::future::Future;
 
 use crate::db::DB;
 

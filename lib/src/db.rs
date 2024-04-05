@@ -11,5 +11,9 @@ pub trait DB: Send + Sync {
         key: String,
         values: HashMap<String, String>,
     ) -> impl Future<Output = Result<()>> + Send;
-    fn read(&self, table: &str, key: &str) -> impl Future<Output = Result<HashMap<String, String>>> + Send;
+    fn read(
+        &self,
+        table: &str,
+        key: &str,
+    ) -> impl Future<Output = Result<HashMap<String, String>>> + Send;
 }
