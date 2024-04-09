@@ -3,7 +3,7 @@ use std::future::Future;
 
 use anyhow::Result;
 
-pub trait DB: Send + Sync {
+pub trait DB: Send + Sync + Clone + 'static {
     fn init(&self) -> Result<()>;
     fn insert(
         &self,
