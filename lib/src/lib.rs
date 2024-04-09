@@ -2,9 +2,11 @@ use crate::db::DB;
 use crate::workload::Workload;
 use anyhow::{bail, Result};
 use futures::future::join_all;
+use futures::stream;
+use futures::{FutureExt, StreamExt};
 use std::fs;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use workload::CoreWorkload;
 
 use properties::Properties;
@@ -46,35 +48,50 @@ async fn thread_runner<T: DB>(db: Arc<T>, wl: Arc<CoreWorkload>, repeat: usize, 
     };
 }
 
+pub struct Output {
+    n_threads: usize,
+    runtime: Duration,
+    throughput: f64,
+}
+
 pub async fn ycsb_run<T: DB + 'static>(
     db: T,
     commands: Vec<String>,
     wl: CoreWorkload,
     operation_count: usize,
     n_threads: usize,
-) -> Result<()> {
+) -> Result<Vec<Output>> {
     db.init()?;
     let db = Arc::new(db);
+    let db = &db;
     let wl = Arc::new(wl);
-    for cmd in commands {
-        let start = Instant::now();
-        let threads = (0..n_threads).map(|_| {
-            let db_ref = db.clone();
-            let wl_ref = wl.clone();
-            let cmd_str = cmd.clone();
-            tokio::task::spawn(async move {
-                thread_runner(db_ref, wl_ref, operation_count / n_threads, &cmd_str).await
-            })
-        });
-        join_all(threads).await;
-        let runtime = start.elapsed().as_millis();
-        println!("[OVERALL], ThreadCount, {}", n_threads);
-        println!("[OVERALL], RunTime(ms), {}", runtime);
-        let throughput = operation_count as f64 / (runtime as f64 / 1000.0);
-        println!("[OVERALL], Throughput(ops/sec), {}", throughput);
-    }
+    let wl = &wl;
+    let outputs: Vec<_> = stream::iter(commands)
+        .map(|cmd| async move {
+            let start = Instant::now();
+            let threads = (0..n_threads).map(|_| {
+                let db_ref = db.clone();
+                let wl_ref = wl.clone();
+                let cmd_str = cmd.clone();
+                tokio::task::spawn(async move {
+                    thread_runner(db_ref, wl_ref, operation_count / n_threads, &cmd_str).await
+                })
+            });
+            join_all(threads).await;
+            let runtime = start.elapsed();
+            let throughput = operation_count as f64 / (runtime.as_millis() as f64 / 1000.0);
 
-    Ok(())
+            Output {
+                n_threads,
+                runtime,
+                throughput,
+            }
+        })
+        .flat_map(FutureExt::into_stream)
+        .collect()
+        .await;
+
+    Ok(outputs)
 }
 
 pub async fn ycsb_main<T: DB + 'static>(db: T) -> Result<()> {
@@ -96,5 +113,13 @@ pub async fn ycsb_main<T: DB + 'static>(db: T) -> Result<()> {
 
     let n_threads = opt.threads;
     let operation_count = props.operation_count as usize;
-    ycsb_run(db, commands, wl, operation_count, n_threads).await
+    let outputs = ycsb_run(db, commands, wl, operation_count, n_threads).await?;
+
+    for output in outputs {
+        println!("[OVERALL], ThreadCount, {}", output.n_threads);
+        println!("[OVERALL], RunTime(ms), {}", output.runtime.as_millis());
+        println!("[OVERALL], Throughput(ops/sec), {}", output.throughput);
+    }
+
+    Ok(())
 }
