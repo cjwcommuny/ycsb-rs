@@ -42,7 +42,7 @@ async fn run<T: DB>(wl: &CoreWorkload, db: &T, repeat: usize) {
 
 async fn thread_runner<T: DB>(db: T, wl: &CoreWorkload, repeat: usize, cmd: &str) {
     match cmd {
-        "load" => load(&wl, &db, repeat).await,
+        "load" => load(wl, &db, repeat).await,
         "run" => run(wl, &db, repeat).await,
         _ => panic!("invalid command: {}", cmd),
     };
