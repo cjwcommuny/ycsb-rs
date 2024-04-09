@@ -40,10 +40,10 @@ async fn run<T: DB>(wl: &CoreWorkload, db: &T, repeat: usize) {
     }
 }
 
-async fn thread_runner<T: DB>(db: Arc<T>, wl: Arc<CoreWorkload>, repeat: usize, cmd: &str) {
+async fn thread_runner<T: DB>(db: T, wl: &CoreWorkload, repeat: usize, cmd: &str) {
     match cmd {
-        "load" => load(wl.as_ref(), db.as_ref(), repeat).await,
-        "run" => run(wl.as_ref(), db.as_ref(), repeat).await,
+        "load" => load(&wl, &db, repeat).await,
+        "run" => run(wl, &db, repeat).await,
         _ => panic!("invalid command: {}", cmd),
     };
 }
@@ -54,27 +54,24 @@ pub struct Output {
     throughput: f64,
 }
 
-pub async fn ycsb_run<T: DB + 'static>(
+pub async fn ycsb_run<T: DB>(
     db: T,
-    commands: Vec<String>,
-    wl: CoreWorkload,
+    commands: impl IntoIterator<Item = String>,
+    wl: &Arc<CoreWorkload>,
     operation_count: usize,
     n_threads: usize,
 ) -> Result<Vec<Output>> {
     db.init()?;
-    let db = Arc::new(db);
     let db = &db;
-    let wl = Arc::new(wl);
-    let wl = &wl;
     let outputs: Vec<_> = stream::iter(commands)
         .map(|cmd| async move {
             let start = Instant::now();
             let threads = (0..n_threads).map(|_| {
-                let db_ref = db.clone();
-                let wl_ref = wl.clone();
+                let db = db.clone();
                 let cmd_str = cmd.clone();
+                let wl = wl.clone();
                 tokio::task::spawn(async move {
-                    thread_runner(db_ref, wl_ref, operation_count / n_threads, &cmd_str).await
+                    thread_runner(db, &wl, operation_count / n_threads, &cmd_str).await
                 })
             });
             join_all(threads).await;
@@ -94,7 +91,7 @@ pub async fn ycsb_run<T: DB + 'static>(
     Ok(outputs)
 }
 
-pub async fn ycsb_main<T: DB + 'static>(db: T) -> Result<()> {
+pub async fn ycsb_main<T: DB>(db: T) -> Result<()> {
     let opt = Opt::from_args();
 
     let raw_props = fs::read_to_string(&opt.workload)?;
@@ -103,7 +100,7 @@ pub async fn ycsb_main<T: DB + 'static>(db: T) -> Result<()> {
 
     let props = Arc::new(props);
 
-    let wl = CoreWorkload::new(&props);
+    let wl = Arc::new(CoreWorkload::new(&props));
 
     let commands = opt.commands;
 
@@ -113,7 +110,7 @@ pub async fn ycsb_main<T: DB + 'static>(db: T) -> Result<()> {
 
     let n_threads = opt.threads;
     let operation_count = props.operation_count as usize;
-    let outputs = ycsb_run(db, commands, wl, operation_count, n_threads).await?;
+    let outputs = ycsb_run(db, commands, &wl, operation_count, n_threads).await?;
 
     for output in outputs {
         println!("[OVERALL], ThreadCount, {}", output.n_threads);
