@@ -107,16 +107,20 @@ impl Workload for CoreWorkload {
             .unwrap()
             .next_value(&mut self.rng.lock().unwrap());
         let dbkey = format!("{}", fnvhash64(dbkey));
-        let values: HashMap<_, _> = self.field_names.iter().map(|field_name| {
-            let field_len = self
-                .field_length_generator
-                .lock()
-                .unwrap()
-                .next_value(&mut self.rng.lock().unwrap());
-            let s = Alphanumeric
-                .sample_string::<SmallRng>(&mut self.rng.lock().unwrap(), field_len as usize);
-            (field_name.clone(), s)
-        }).collect();
+        let values: HashMap<_, _> = self
+            .field_names
+            .iter()
+            .map(|field_name| {
+                let field_len = self
+                    .field_length_generator
+                    .lock()
+                    .unwrap()
+                    .next_value(&mut self.rng.lock().unwrap());
+                let s = Alphanumeric
+                    .sample_string::<SmallRng>(&mut self.rng.lock().unwrap(), field_len as usize);
+                (field_name.clone(), s)
+            })
+            .collect();
 
         db.insert(self.table.clone(), dbkey, values).await.unwrap();
     }
