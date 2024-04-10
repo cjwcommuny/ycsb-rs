@@ -85,3 +85,25 @@ pub struct Properties {
     )]
     pub read_modify_write_proportion: f64,
 }
+
+impl Default for Properties {
+    fn default() -> Self {
+        Self {
+            insert_start: 0,
+            insert_count: 0,
+            operation_count: 0,
+            record_count: 0,
+            thread_count: thread_count_default(),
+            max_execution_time: None,
+            warmup_time: None,
+            field_length_distribution: request_distribution_default(),
+            request_distribution: request_distribution_default(),
+            field_length: field_length_default(),
+            read_proportion: read_proportion_default(),
+            update_proportion: update_proportion_default(),
+            insert_proportion: insert_proportion_default(),
+            scan_proportion: scan_proportion_default(),
+            read_modify_write_proportion: read_modify_write_proportion_default(),
+        }
+    }
+}
